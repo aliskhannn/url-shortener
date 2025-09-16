@@ -1,9 +1,11 @@
 -- +goose Up
 -- +goose StatementBegin
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE analytics
 (
-    id          BIGSERIAL PRIMARY KEY,
-    link_id     INT       NOT NULL REFERENCES links (id) ON DELETE CASCADE,
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    link_id     UUID NOT NULL REFERENCES links(id) ON DELETE CASCADE,
     user_agent  TEXT,
     device_type VARCHAR(32),
     os          VARCHAR(64),
@@ -16,4 +18,5 @@ CREATE TABLE analytics
 -- +goose Down
 -- +goose StatementBegin
 DROP TABLE IF EXISTS analytics;
+DROP EXTENSION IF EXISTS "uuid-ossp";
 -- +goose StatementEnd
