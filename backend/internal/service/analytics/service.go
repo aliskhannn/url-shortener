@@ -17,7 +17,7 @@ import (
 // analyticsRepository defines the interface for link analytics persistence operations.
 type analyticsRepository interface {
 	SaveAnalytics(ctx context.Context, event model.Analytics) (uuid.UUID, error)
-	GetAnalytics(ctx context.Context, linkID uuid.UUID) (model.Analytics, error)
+	GetAnalytics(ctx context.Context, alias string) (model.Analytics, error)
 }
 
 // cache defines the interface for caching link analytics.
@@ -53,11 +53,11 @@ func (s *Service) SaveAnalytics(ctx context.Context, strategy retry.Strategy, ev
 	}
 
 	// Cache the link analytics.
-	err = s.cache.SetWithRetry(ctx, strategy, event.LinkID.String(), string(b))
+	err = s.cache.SetWithRetry(ctx, strategy, event.Alias, string(b))
 	if err != nil {
 		zlog.Logger.Error().
 			Err(err).
-			Str("link id", event.LinkID.String()).
+			Str("alias", event.Alias).
 			Msg("failed to cache link analytics")
 	}
 
@@ -67,11 +67,11 @@ func (s *Service) SaveAnalytics(ctx context.Context, strategy retry.Strategy, ev
 // GetAnalytics retrieves a link analytics by linkID.
 // It first tries to get the link analytics from cache. If the cache misses,
 // it fetches the link analytics from the repository and updates the cache.
-func (s *Service) GetAnalytics(ctx context.Context, strategy retry.Strategy, linkID uuid.UUID) (model.Analytics, error) {
+func (s *Service) GetAnalytics(ctx context.Context, strategy retry.Strategy, alias string) (model.Analytics, error) {
 	var event model.Analytics
 
 	// Check cache first.
-	str, err := s.cache.GetWithRetry(ctx, strategy, linkID.String())
+	str, err := s.cache.GetWithRetry(ctx, strategy, alias)
 	if err == nil {
 		// Unmarshal cached JSON into a link.
 		err = json.Unmarshal([]byte(str), &event)
@@ -84,7 +84,7 @@ func (s *Service) GetAnalytics(ctx context.Context, strategy retry.Strategy, lin
 
 	// If cache misses, fetch from repo and update cache.
 	if errors.Is(err, redis.Nil) {
-		event, err = s.repo.GetAnalytics(ctx, linkID)
+		event, err = s.repo.GetAnalytics(ctx, alias)
 		if err != nil {
 			return model.Analytics{}, fmt.Errorf("get link by alias: %w", err)
 		}
@@ -96,11 +96,11 @@ func (s *Service) GetAnalytics(ctx context.Context, strategy retry.Strategy, lin
 		}
 
 		// Cache the link.
-		err = s.cache.SetWithRetry(ctx, strategy, linkID.String(), string(b))
+		err = s.cache.SetWithRetry(ctx, strategy, alias, string(b))
 		if err != nil {
 			zlog.Logger.Error().
 				Err(err).
-				Str("link id", event.LinkID.String()).
+				Str("alias", alias).
 				Msg("failed to cache link analytics")
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
@@ -12,6 +13,11 @@ import (
 	"github.com/wb-go/wbf/zlog"
 
 	"github.com/aliskhannn/url-shortener/internal/model"
+	linkrepo "github.com/aliskhannn/url-shortener/internal/repository/link"
+)
+
+var (
+	ErrAliasAlreadyExists = errors.New("alias already exists")
 )
 
 // linkRepository defines the interface for link persistence operations.
@@ -39,6 +45,27 @@ func NewService(repo linkRepository, cache cache) *Service {
 
 // CreateLink creates a new link and caches it.
 func (s *Service) CreateLink(ctx context.Context, strategy retry.Strategy, link model.Link) (uuid.UUID, error) {
+	// If no alias provided, generate random 6-character alias.
+	if link.Alias == "" {
+		for {
+			link.Alias = s.generateRandomAlias(6) // 6-character alias
+			_, err := s.GetLinkByAlias(ctx, strategy, link.Alias)
+			if errors.Is(err, linkrepo.ErrAliasNotFound) {
+				break // unique alias found
+			}
+		}
+	} else {
+		// If alias provided check if it already exists.
+		_, err := s.GetLinkByAlias(ctx, strategy, link.Alias)
+		if err != nil && !errors.Is(err, linkrepo.ErrAliasNotFound) {
+			return uuid.Nil, fmt.Errorf("failed to check existing alias: %w", err)
+		}
+
+		if err == nil {
+			return uuid.Nil, ErrAliasAlreadyExists
+		}
+	}
+
 	id, err := s.repo.CreateLink(ctx, link)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("create link: %w", err)
@@ -62,6 +89,16 @@ func (s *Service) CreateLink(ctx context.Context, strategy retry.Strategy, link 
 	}
 
 	return id, nil
+}
+
+// generateRandomAlias generates a random string of the given length
+func (s *Service) generateRandomAlias(length int) string {
+	const aliasChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = aliasChars[rand.Intn(len(aliasChars))]
+	}
+	return string(b)
 }
 
 // GetLinkByAlias retrieves a shortened link by its alias.
