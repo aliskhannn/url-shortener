@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE analytics
 (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    link_id     UUID NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+    alias VARCHAR(32) NOT NULL REFERENCES links(alias) ON DELETE CASCADE,
     user_agent  TEXT,
     device_type VARCHAR(32),
     os          VARCHAR(64),

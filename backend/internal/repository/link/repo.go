@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrLinkNotFound = errors.New("link not found")
+	ErrAliasNotFound = errors.New("link not found")
 )
 
 // Repository provides methods to interact with links table.
@@ -56,7 +56,7 @@ func (r *Repository) GetLinkByAlias(ctx context.Context, alias string) (model.Li
 	).Scan(&link.ID, &link.URL, &link.Alias)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return model.Link{}, ErrLinkNotFound
+			return model.Link{}, ErrAliasNotFound
 		}
 
 		return model.Link{}, fmt.Errorf("get link by alias: %w", err)
