@@ -8,7 +8,6 @@ import (
 	"math/rand"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/google/uuid"
 	"github.com/wb-go/wbf/retry"
 	"github.com/wb-go/wbf/zlog"
 
@@ -22,7 +21,7 @@ var (
 
 // linkRepository defines the interface for link persistence operations.
 type linkRepository interface {
-	CreateLink(ctx context.Context, link model.Link) (uuid.UUID, error)
+	CreateLink(ctx context.Context, link model.Link) (model.Link, error)
 	GetLinkByAlias(ctx context.Context, alias string) (model.Link, error)
 }
 
@@ -44,7 +43,7 @@ func NewService(repo linkRepository, cache cache) *Service {
 }
 
 // CreateLink creates a new link and caches it.
-func (s *Service) CreateLink(ctx context.Context, strategy retry.Strategy, link model.Link) (uuid.UUID, error) {
+func (s *Service) CreateLink(ctx context.Context, strategy retry.Strategy, link model.Link) (model.Link, error) {
 	// If no alias provided, generate random 6-character alias.
 	if link.Alias == "" {
 		for {
@@ -58,25 +57,23 @@ func (s *Service) CreateLink(ctx context.Context, strategy retry.Strategy, link 
 		// If alias provided check if it already exists.
 		_, err := s.GetLinkByAlias(ctx, strategy, link.Alias)
 		if err != nil && !errors.Is(err, linkrepo.ErrAliasNotFound) {
-			return uuid.Nil, fmt.Errorf("failed to check existing alias: %w", err)
+			return model.Link{}, fmt.Errorf("failed to check existing alias: %w", err)
 		}
 
 		if err == nil {
-			return uuid.Nil, ErrAliasAlreadyExists
+			return model.Link{}, ErrAliasAlreadyExists
 		}
 	}
 
-	id, err := s.repo.CreateLink(ctx, link)
+	res, err := s.repo.CreateLink(ctx, link)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("create link: %w", err)
+		return model.Link{}, fmt.Errorf("create link: %w", err)
 	}
-
-	link.ID = id
 
 	// Marshal link into JSON before caching.
 	b, err := json.Marshal(link)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("marshal link: %w", err)
+		return model.Link{}, fmt.Errorf("marshal link: %w", err)
 	}
 
 	// Cache the link.
@@ -88,7 +85,7 @@ func (s *Service) CreateLink(ctx context.Context, strategy retry.Strategy, link 
 			Msg("failed to cache link")
 	}
 
-	return id, nil
+	return res, nil
 }
 
 // generateRandomAlias generates a random string of the given length

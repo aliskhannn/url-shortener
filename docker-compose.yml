@@ -8,14 +8,14 @@ services:
     environment:
       - VITE_API_URL=http://shortener:8080
     depends_on:
-      - notifier
+      - shortener
     networks:
       - app-network
 
   shortener:
     build: ./backend
     command: ./url-shortener
-    container_name: notifier
+    container_name: shortener
     ports:
       - "8080:8080"
     depends_on:
@@ -23,8 +23,6 @@ services:
         condition: service_healthy
       migrator:
         condition: service_completed_successfully
-      rabbitmq:
-        condition: service_healthy
     environment:
       - DB_HOST=${DB_HOST}
       - DB_PORT=${DB_PORT}

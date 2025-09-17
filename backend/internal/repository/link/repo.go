@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/wb-go/wbf/dbpg"
 
 	"github.com/aliskhannn/url-shortener/internal/model"
@@ -27,19 +26,19 @@ func NewRepository(db *dbpg.DB) *Repository {
 }
 
 // CreateLink inserts a new link into the database and returns its ID.
-func (r *Repository) CreateLink(ctx context.Context, link model.Link) (uuid.UUID, error) {
+func (r *Repository) CreateLink(ctx context.Context, link model.Link) (model.Link, error) {
 	query := `
 		INSERT INTO links (url, alias)
 		VALUES ($1, $2)
-		RETURNING id;
+		RETURNING id, alias, created_at;
     `
 
-	err := r.db.Master.QueryRowContext(ctx, query, link.URL, link.Alias).Scan(&link.ID)
+	err := r.db.Master.QueryRowContext(ctx, query, link.URL, link.Alias).Scan(&link.ID, &link.Alias, &link.CreatedAt)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("insert link: %w", err)
+		return model.Link{}, fmt.Errorf("insert link: %w", err)
 	}
 
-	return link.ID, nil
+	return link, nil
 }
 
 // GetLinkByAlias retrieves the link by its alias.

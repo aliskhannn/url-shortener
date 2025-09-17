@@ -2,18 +2,12 @@ package analytics
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/wb-go/wbf/dbpg"
 
 	"github.com/aliskhannn/url-shortener/internal/model"
-)
-
-var (
-	ErrAnalyticsNotFound = errors.New("analytics not found")
 )
 
 // Repository provides methods to interact with analytics table.
@@ -45,29 +39,78 @@ func (r *Repository) SaveAnalytics(ctx context.Context, event model.Analytics) (
 	return event.ID, nil
 }
 
-// GetAnalytics retrieves the link analytics by link id.
-func (r *Repository) GetAnalytics(ctx context.Context, alias string) (model.Analytics, error) {
-	query := `
- 		SELECT id, alias, user_agent, device_type, os, browser, ip_address
-		FROM analytics
-		WHERE alias = $1
- 		ORDER BY created_at DESC;
-    `
+// CountClicks returns the total number of clicks for a short link alias.
+func (r *Repository) CountClicks(ctx context.Context, alias string) (int, error) {
+	var count int
 
-	var analytics model.Analytics
-	err := r.db.Master.QueryRowContext(
-		ctx, query, alias,
-	).Scan(
-		&analytics.ID, &analytics.Alias, &analytics.UserAgent,
-		&analytics.Device, &analytics.OS, &analytics.Browser, &analytics.IP,
-	)
+	query := `SELECT COUNT(*) FROM analytics WHERE alias = $1;`
+
+	err := r.db.Master.QueryRowContext(ctx, query, alias).Scan(&count)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return model.Analytics{}, ErrAnalyticsNotFound
-		}
-
-		return model.Analytics{}, fmt.Errorf("get analytics: %w", err)
+		return 0, fmt.Errorf("count clicks: %w", err)
 	}
 
-	return analytics, nil
+	return count, nil
+}
+
+// GetClicksByDay returns number of clicks grouped by day.
+func (r *Repository) GetClicksByDay(ctx context.Context, alias string) (map[string]int, error) {
+	query := `
+		SELECT TO_CHAR(created_at, 'YYYY-MM-DD') AS day, COUNT(*)
+		FROM analytics
+		WHERE alias = $1
+		GROUP BY day
+		ORDER BY day DESC;
+    `
+
+	rows, err := r.db.QueryContext(ctx, query, alias)
+	if err != nil {
+		return nil, fmt.Errorf("query clicks by day: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int)
+	for rows.Next() {
+		var day string
+		var count int
+
+		if err := rows.Scan(&day, &count); err != nil {
+			return nil, fmt.Errorf("scan clicks by day: %w", err)
+		}
+
+		result[day] = count
+	}
+
+	return result, nil
+}
+
+// GetClicksByUserAgent returns number of clicks grouped by User-Agent.
+func (r *Repository) GetClicksByUserAgent(ctx context.Context, alias string) (map[string]int, error) {
+	query := `
+		SELECT user_agent, COUNT(*) 
+		FROM analytics
+		WHERE alias = $1
+		GROUP BY user_agent
+		ORDER BY COUNT(*) DESC;
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, alias)
+	if err != nil {
+		return nil, fmt.Errorf("query clicks by user-agent: %w", err)
+	}
+	defer rows.Close()
+
+	result := make(map[string]int)
+	for rows.Next() {
+		var ua string
+		var count int
+
+		if err := rows.Scan(&ua, &count); err != nil {
+			return nil, fmt.Errorf("scan clicks by user-agent: %w", err)
+		}
+
+		result[ua] = count
+	}
+
+	return result, nil
 }

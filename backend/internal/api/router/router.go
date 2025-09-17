@@ -28,8 +28,8 @@ func New(linkHandler *link.Handler, analyticsHandler *analytics.Handler) *ginext
 	api := e.Group("/api")
 	{
 		api.POST("/shorten", linkHandler.ShortenLink)
-		api.GET("/s/:short_url", linkHandler.RedirectLink)
-		api.GET("/analytics/:short_url", analyticsHandler.GetAnalytics)
+		api.GET("/s/:alias", linkHandler.RedirectLink)
+		api.GET("/analytics/:alias", analyticsHandler.GetAnalytics)
 	}
 
 	return e

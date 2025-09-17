@@ -1,24 +1,27 @@
-import { useState } from 'react'
-import { createLink } from '../api/api'
+import { useState } from "react";
+import { createLink } from "../api/api";
 
 export const LinkForm = () => {
-  const [url, setUrl] = useState('')
-  const [alias, setAlias] = useState('')
-  const [result, setResult] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [url, setUrl] = useState("");
+  const [alias, setAlias] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const [analyticsURL, setAnalyticsURL] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setResult(null)
+    e.preventDefault();
+    setError(null);
+    setResult(null);
 
     try {
-      const data = await createLink({ url, alias: alias || undefined })
-      setResult(`${window.location.origin}/s/${data.alias}`)
+      const data = await createLink({ url, alias: alias || undefined });
+      console.log(data);
+      setResult(`http://localhost:8080/api/s/${data.alias}`);
+      setAnalyticsURL(`http://localhost:3000/analytics/${data.alias}`);
     } catch (err: any) {
-      setError(err.message)
+      setError(err.message);
     }
-  }
+  };
 
   return (
     <div className="max-w-md mx-auto p-4">
@@ -28,7 +31,7 @@ export const LinkForm = () => {
           type="url"
           placeholder="Enter URL"
           value={url}
-          onChange={e => setUrl(e.target.value)}
+          onChange={(e) => setUrl(e.target.value)}
           required
           className="border p-2 rounded"
         />
@@ -36,20 +39,34 @@ export const LinkForm = () => {
           type="text"
           placeholder="Custom alias (optional)"
           value={alias}
-          onChange={e => setAlias(e.target.value)}
+          onChange={(e) => setAlias(e.target.value)}
           className="border p-2 rounded"
         />
-        <button type="submit" className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600">
+        <button
+          type="submit"
+          className="bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+        >
           Shorten
         </button>
       </form>
 
-      {result && (
-        <div className="mt-4 text-green-600">
-          Short URL: <a href={result} target="_blank" className="underline">{result}</a>
-        </div>
+      {result && analyticsURL && (
+        <>
+          <div className="mt-4 text-green-600">
+            Short URL:{" "}
+            <a href={result} target="_blank" className="underline">
+              {result}
+            </a>
+          </div>
+          <div className="mt-4 text-green-600">
+            Analytics:{" "}
+            <a href={analyticsURL} target="_blank" className="underline">
+              {analyticsURL}
+            </a>
+          </div>
+        </>
       )}
       {error && <div className="mt-4 text-red-600">{error}</div>}
     </div>
-  )
-}
+  );
+};

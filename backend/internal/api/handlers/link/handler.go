@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -24,7 +25,7 @@ import (
 
 // linkService defines the interface that the Handler depends on.
 type linkService interface {
-	CreateLink(ctx context.Context, strategy retry.Strategy, link model.Link) (uuid.UUID, error)
+	CreateLink(ctx context.Context, strategy retry.Strategy, link model.Link) (model.Link, error)
 	GetLinkByAlias(ctx context.Context, strategy retry.Strategy, alias string) (model.Link, error)
 }
 
@@ -80,11 +81,12 @@ func (h *Handler) ShortenLink(c *ginext.Context) {
 	}
 
 	// Create a shorted link using the service layer.
-	id, err := h.linkService.CreateLink(c.Request.Context(), h.cfg.Retry, link)
+	res, err := h.linkService.CreateLink(c.Request.Context(), h.cfg.Retry, link)
 	if err != nil {
 		if errors.Is(err, linksvc.ErrAliasAlreadyExists) {
 			zlog.Logger.Error().Err(err).Msg("alias already exists")
 			respond.Fail(c.Writer, http.StatusConflict, fmt.Errorf("alias already exists"))
+			return
 		}
 
 		zlog.Logger.Error().Err(err).Str("alias", link.Alias).Msg("failed to shorten link")
@@ -93,7 +95,7 @@ func (h *Handler) ShortenLink(c *ginext.Context) {
 	}
 
 	// Respond with created link ID.
-	respond.Created(c.Writer, id)
+	respond.Created(c.Writer, res)
 }
 
 func (h *Handler) RedirectLink(c *ginext.Context) {
@@ -119,7 +121,8 @@ func (h *Handler) RedirectLink(c *ginext.Context) {
 		return
 	}
 
-	event := h.buildAnalytics(link.ID, c.Request)
+	event := h.buildAnalytics(link.Alias, c.Request)
+	zlog.Logger.Info().Interface("event", event).Msg("got event")
 
 	go h.saveAnalyticsAsync(event)
 
@@ -141,7 +144,7 @@ func (h *Handler) saveAnalyticsAsync(event model.Analytics) {
 	zlog.Logger.Info().Str("id", id.String()).Msg("saved analytics")
 }
 
-func (h *Handler) buildAnalytics(linkID uuid.UUID, r *http.Request) model.Analytics {
+func (h *Handler) buildAnalytics(alias string, r *http.Request) model.Analytics {
 	ua := user_agent.New(r.UserAgent())
 
 	browserName, _ := ua.Browser()
@@ -152,11 +155,17 @@ func (h *Handler) buildAnalytics(linkID uuid.UUID, r *http.Request) model.Analyt
 		device = "bot"
 	}
 
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		ip = r.RemoteAddr
+	}
+
 	return model.Analytics{
+		Alias:     alias,
 		UserAgent: r.UserAgent(),
 		Device:    device,
 		OS:        ua.OS(),
 		Browser:   browserName,
-		IP:        r.RemoteAddr,
+		IP:        ip,
 	}
 }

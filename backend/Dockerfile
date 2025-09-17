@@ -8,6 +8,8 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o notifier ./cmd/url-shortener/main.go
+RUN go mod tidy
+RUN go mod download
+RUN go build -o url-shortener ./cmd/url-shortener/main.go
 
 EXPOSE 8080
