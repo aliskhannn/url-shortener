@@ -33,9 +33,12 @@ func NewHandler(
 	return &Handler{analyticsService: as, cfg: cfg}
 }
 
+// GetAnalytics handles GET /analytics/:alias requests.
+// It retrieves analytics summary (total clicks, clicks by day, clicks by user agent) for a given alias.
 func (h *Handler) GetAnalytics(c *ginext.Context) {
 	alias := c.Param("alias")
 	if alias == "" {
+		// Handle missing alias in request.
 		zlog.Logger.Warn().Msg("missing alias")
 		respond.Fail(c.Writer, http.StatusBadRequest, fmt.Errorf("missing alias"))
 		return

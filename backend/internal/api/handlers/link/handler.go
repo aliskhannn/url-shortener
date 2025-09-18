@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -36,27 +35,32 @@ type analyticsService interface {
 
 // Handler handles HTTP requests related to link.
 type Handler struct {
+	ctx              context.Context
+	cfg              *config.Config
+	validator        *validator.Validate
 	linkService      linkService
 	analyticsService analyticsService
-	validator        *validator.Validate
-	cfg              *config.Config
 }
 
 // NewHandler creates a new Handler instance.
 func NewHandler(
+	ctx context.Context,
+	cfg *config.Config,
+	v *validator.Validate,
 	ls linkService,
 	as analyticsService,
-	v *validator.Validate,
-	cfg *config.Config,
 ) *Handler {
-	return &Handler{linkService: ls, analyticsService: as, validator: v, cfg: cfg}
+	return &Handler{ctx: ctx, cfg: cfg, validator: v, linkService: ls, analyticsService: as}
 }
 
+// CreateRequest represents the expected JSON payload for creating a shortened link.
 type CreateRequest struct {
 	URL   string `json:"url" validate:"required"`
 	Alias string `json:"alias"`
 }
 
+// ShortenLink handles POST /shorten requests.
+// It validates input, creates a new short link, and returns it.
 func (h *Handler) ShortenLink(c *ginext.Context) {
 	var req CreateRequest
 
@@ -83,21 +87,24 @@ func (h *Handler) ShortenLink(c *ginext.Context) {
 	// Create a shorted link using the service layer.
 	res, err := h.linkService.CreateLink(c.Request.Context(), h.cfg.Retry, link)
 	if err != nil {
+		// Handle duplicate alias.
 		if errors.Is(err, linksvc.ErrAliasAlreadyExists) {
 			zlog.Logger.Error().Err(err).Msg("alias already exists")
 			respond.Fail(c.Writer, http.StatusConflict, fmt.Errorf("alias already exists"))
 			return
 		}
 
+		// Internal errors.
 		zlog.Logger.Error().Err(err).Str("alias", link.Alias).Msg("failed to shorten link")
 		respond.Fail(c.Writer, http.StatusInternalServerError, fmt.Errorf("internal server error"))
 		return
 	}
 
-	// Respond with created link ID.
 	respond.Created(c.Writer, res)
 }
 
+// RedirectLink handles GET /s/:alias requests.
+// It resolves a short alias to the original URL, saves analytics, and redirects the user.
 func (h *Handler) RedirectLink(c *ginext.Context) {
 	alias := c.Param("alias")
 
@@ -107,47 +114,54 @@ func (h *Handler) RedirectLink(c *ginext.Context) {
 		return
 	}
 
+	// Lookup the link in the service (cache → DB).
 	link, err := h.linkService.GetLinkByAlias(c.Request.Context(), h.cfg.Retry, alias)
 	if err != nil {
+		// Handle case when alias does not exist.
 		if errors.Is(err, linkrepo.ErrAliasNotFound) {
 			zlog.Logger.Err(err).Str("alias", alias).Msg("alias not found")
 			respond.Fail(c.Writer, http.StatusNotFound, fmt.Errorf("alias not found"))
 			return
 		}
 
-		// Internal server error.
+		// Internal errors.
 		zlog.Logger.Error().Err(err).Str("alias", alias).Msg("failed to get link")
 		respond.Fail(c.Writer, http.StatusInternalServerError, fmt.Errorf("internal server error"))
 		return
 	}
 
+	// Build an analytics event from the request.
 	event := h.buildAnalytics(link.Alias, c.Request)
 	zlog.Logger.Info().Interface("event", event).Msg("got event")
 
+	// Save analytics asynchronously.
 	go h.saveAnalyticsAsync(event)
 
 	http.Redirect(c.Writer, c.Request, link.URL, http.StatusFound)
 }
 
+// saveAnalyticsAsync saves analytics data asynchronously using the global context.
 func (h *Handler) saveAnalyticsAsync(event model.Analytics) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	id, err := h.analyticsService.SaveAnalytics(ctx, h.cfg.Retry, event)
+	id, err := h.analyticsService.SaveAnalytics(h.ctx, h.cfg.Retry, event)
 	if err != nil {
 		zlog.Logger.Error().
 			Err(err).
 			Str("alias", event.Alias).
 			Msg("failed to save analytics")
+		return
 	}
 
 	zlog.Logger.Info().Str("id", id.String()).Msg("saved analytics")
 }
 
+// buildAnalytics constructs an Analytics model from the HTTP request.
 func (h *Handler) buildAnalytics(alias string, r *http.Request) model.Analytics {
 	ua := user_agent.New(r.UserAgent())
 
+	// Detect browser name.
 	browserName, _ := ua.Browser()
+
+	// Detect a device type.
 	device := "desktop"
 	if ua.Mobile() {
 		device = "mobile"
@@ -155,6 +169,7 @@ func (h *Handler) buildAnalytics(alias string, r *http.Request) model.Analytics 
 		device = "bot"
 	}
 
+	// Extract client IP (RemoteAddr may include port).
 	ip, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		ip = r.RemoteAddr

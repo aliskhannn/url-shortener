@@ -72,7 +72,7 @@ func main() {
 	linkService := linksvc.NewService(linkRepo, rdb)
 	analyticsService := analyticssvc.NewService(analyticsRepo, rdb)
 
-	linkHandler := link.NewHandler(linkService, analyticsService, val, cfg)
+	linkHandler := link.NewHandler(ctx, cfg, val, linkService, analyticsService)
 	analyticsHandler := analytics.NewHandler(analyticsService, cfg)
 
 	r := router.New(linkHandler, analyticsHandler)
