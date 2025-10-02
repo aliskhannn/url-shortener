@@ -1,8 +1,8 @@
 services:
   frontend:
     build:
-      context: ./frontend
-    container_name: shortener_frontend
+      context: ./website
+    container_name: shortener_ui
     ports:
       - "3000:80"   # http://localhost:3000
     environment:
@@ -13,7 +13,7 @@ services:
       - app-network
 
   shortener:
-    build: ./backend
+    build: ./
     command: ./url-shortener
     container_name: shortener
     ports:

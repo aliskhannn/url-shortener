@@ -29,7 +29,7 @@ func (r *Repository) SaveAnalytics(ctx context.Context, event model.Analytics) (
 		RETURNING id;
     `
 
-	err := r.db.Master.QueryRowContext(
+	err := r.db.QueryRowContext(
 		ctx, query, event.Alias, event.UserAgent, event.Device, event.OS, event.Browser, event.IP,
 	).Scan(&event.ID)
 	if err != nil {
@@ -45,7 +45,7 @@ func (r *Repository) CountClicks(ctx context.Context, alias string) (int, error)
 
 	query := `SELECT COUNT(*) FROM analytics WHERE alias = $1;`
 
-	err := r.db.Master.QueryRowContext(ctx, query, alias).Scan(&count)
+	err := r.db.QueryRowContext(ctx, query, alias).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count clicks: %w", err)
 	}

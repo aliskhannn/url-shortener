@@ -33,7 +33,7 @@ func (r *Repository) CreateLink(ctx context.Context, link model.Link) (model.Lin
 		RETURNING id, alias, created_at;
     `
 
-	err := r.db.Master.QueryRowContext(ctx, query, link.URL, link.Alias).Scan(&link.ID, &link.Alias, &link.CreatedAt)
+	err := r.db.QueryRowContext(ctx, query, link.URL, link.Alias).Scan(&link.ID, &link.Alias, &link.CreatedAt)
 	if err != nil {
 		return model.Link{}, fmt.Errorf("insert link: %w", err)
 	}
@@ -50,7 +50,7 @@ func (r *Repository) GetLinkByAlias(ctx context.Context, alias string) (model.Li
     `
 
 	var link model.Link
-	err := r.db.Master.QueryRowContext(
+	err := r.db.QueryRowContext(
 		ctx, query, alias,
 	).Scan(&link.ID, &link.URL, &link.Alias)
 	if err != nil {

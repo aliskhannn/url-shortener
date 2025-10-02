@@ -126,6 +126,8 @@ github.com/ugorji/go/codec v1.2.11 h1:BMaWp1Bb6fHwEtbplGBGJ498wD+LKlNSl25MjdZY4d
 github.com/ugorji/go/codec v1.2.11/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
 github.com/wb-go/wbf v0.0.4 h1:+7WgjpImAvwabulllEe4FwojEiw5UFAiSaa3XH8ceVQ=
 github.com/wb-go/wbf v0.0.4/go.mod h1:2RXYh44okqUlbYQTzv0Xnmcmq+vxq1SuQRaarX9s1fo=
+github.com/wb-go/wbf v0.0.5 h1:PJnsb1tvXmdx7YKNIr9ocKEOGSPqgy2/n0GskuUHYnI=
+github.com/wb-go/wbf v0.0.5/go.mod h1:2RXYh44okqUlbYQTzv0Xnmcmq+vxq1SuQRaarX9s1fo=
 go.uber.org/atomic v1.9.0 h1:ECmE8Bn/WFTYwEW/bpKD3M8VtR/zQVbavAoalC1PYyE=
 go.uber.org/atomic v1.9.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
 go.uber.org/multierr v1.9.0 h1:7fIwc/ZtS0q++VgcfqFDxSBZVv/Xo49/SYnDFupUwlI=
