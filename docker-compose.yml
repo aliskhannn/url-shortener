@@ -2,7 +2,7 @@ services:
   frontend:
     build:
       context: ./website
-    container_name: shortener_ui
+    container_name: shortener-ui
     ports:
       - "3000:80"   # http://localhost:3000
     environment:
@@ -53,7 +53,7 @@ services:
       timeout: 3s
       retries: 1
     volumes:
-      - ./backend/migrations:/migrations
+      - ./migrations:/migrations
     networks:
       - app-network
 
